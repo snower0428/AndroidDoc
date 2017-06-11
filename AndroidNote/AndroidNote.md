@@ -1,5 +1,5 @@
 
-### Android大致可以分为四层架构：
+# Android大致可以分为四层架构：
 1. Linux内核层
 2. 系统运行库层
 3. 应用框架层
@@ -7,19 +7,19 @@
 
 ***
 
-### Android系统架构图
+# Android系统架构图
 
 ![Android系统架构图](./images/AndroidSystem.jpg)
 
 ***
 
-### Android系统版本分布图
+# Android系统版本分布图
 
 ![Android系统版本](./images/AndroidVersionInfo.jpg)
 
 ---
 
-### 准备工具
+# 准备工具
 - JDK
 > 包含Java的运行环境、工具集合、基础类库等。
 
@@ -28,7 +28,7 @@
 
 ---
 
-### 项目目录结构
+# 项目目录结构
 
 ![目录结构](./images/ProjectStructure.PNG)
 
@@ -72,7 +72,7 @@
 
 ---
 
-### app目录结构
+# app目录结构
 
 ![app目录结构](./images/AppDirectoryStructure.PNG)
 
@@ -113,10 +113,10 @@
 
 ---
 
-### Android四大组件
+# Android四大组件
 > 活动(Activity)、服务(Service)、广播接收器(Broadcast Reveiver)、内容提供器(Content Provider)
 
-#### 1. 活动(Activity)
+## 1. 活动(Activity)
 > 是一种可以包含用户界面的组件，主要用于和用户进行交互。
 > 简单来说就是我们所看到的应用程序的页面，就叫活动。
 
@@ -134,23 +134,27 @@
 
 - 向下一个Activity传递数据
 
-```
-    在第一个Activity中这样传递数据：
+```java
+    // 在第一个Activity中这样传递数据
     String data = "Hello ScecondActivity";
     Intent intent = new Intent(FirstActivity.this, SecondActivity.class);
     intent.putExtra("extra_data", data);
     startActivity(intent);
 
-    在第二个Activity中这样接收数据：
+    // 在第二个Activity中这样接收数据
     Intent intent = getIntent();
     String data = intent.getStringExtra("extra_data");
 ```
 
 - 返回数据给上一个Activity
-```
-    在第一个Activity中：
+```java
+    // 在第一个Activity中
     Intent intent = new Intent(FirstActivity.this, SecondActivity.class);
-    // 第二个参数为请求码，用于之后的onActivityResult方法里。
+    /**
+     * 第二个参数为请求码，用于之后的onActivityResult方法里。
+     * 由于使用startActivityForResult来启动第二个Activity，
+     * 所以在第二个Activity返回的时候，会回调上一个Activity的onActivityResult方法。
+     */
     startActivityForResult(intent, 1);
 
     @Override
@@ -163,14 +167,140 @@
                 break;
         }
     }
+
+    // 在第二个Activity中，创建一个Intent对象，只是用来传递返回的数据
+    Intent intent = new Intent();
+    intent.putExtra("data_return", "Hello FirstActivity");
+    setResult(RESULT_OK, intent);
+    finish();
 ```
 
-#### 2. 服务(Service)
+### 活动状态
+
+1. 运行状态
+> 当一个活动位于返回栈的栈顶时，就时活动就处于运行状态。
+
+2. 暂停状态
+> 当一个活动不再处于栈顶位置，但仍然可见的时候。
+
+3. 停止状态
+> 当一个活动不再处于栈顶位置，并且完全不可见的时候。
+
+4. 销毁状态
+> 当一个活动从返回栈中移除后就变成了销毁状态。
+
+### 活动生命周期
+
+- onCreate()
+> 活动第一次被创建时调用。
+
+- onStart()
+> 活动由不可见变为可见时调用。
+
+- onResume()
+> 活动准备好和用户进行交互时调用。此时活动一定位于栈顶，并且处于运行状态。
+
+- onPause()
+> 系统准备去启动或恢复另一个Activity时调用。
+
+- onStop()
+> 活动完全不可见的时候调用。
+
+- onDestory()
+> 活动被销毁之前调用，之后Activity的状态将变为销毁状态。
+
+- onRestart()
+> 活动由停止状态变为运行状态之前调用，也就是活动被重新启动了。
+
+### 流程图
+
+![Acitivty生命周期](./images/ActivityLifeCycle.gif)
+
+### 指定一个Activity为Dialog形式
+```
+    <activity android:name=".DialogActivity"
+        android:theme="@android:style/Theme.Dialog">
+    </activity>
+```
+
+### Activity进入停止状态，被系统回收了，然后重新恢复时，数据的保存和恢复
+> 在onSaveInstanceState保存数据，然后在onCreate里恢复数据
+
+```java
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        String tempData = "Data need to save";
+        outState.putString("data_key", tempData);
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        if (savedInstanceState != null) {
+            String tempData = savedInstanceState.getString("data_key");
+        }
+    }
+```
+
+### Activity启动模式
+> Activity的四种启动模式：standard、singleTop、singleTask、singleInstance。
+
+- 在AndroidManifest.xml中通过<activity>标签的android:launchMode属性来指定启动模式。
+
+```xml
+    <activity
+        android:name=".FirstActivity"
+        android:launchMode="singleTop">
+    </activity>
+```
+
+#### 1. standard
+
+> Activity的默认启动模式。
+> 对于使用standard模式的Activity，系统不会在乎这个Activity是否已经存在，
+> 每次启动都会创建该Activity的一个实例。
+
+![standard模式](./images/StandardMode.png)
+
+#### 2. singleTop
+
+> Acitivity启动模式指定为singleTop时，
+> 在启动Activity时，如果发现栈顶已经是该Activity了，就不会再创建新的Activity了，
+> 如果该Activity不在栈顶，还是会创建该Activity新的实例。
+
+![sintleTop模式](./images/SingleTopMode.png)
+
+#### 3. singleTask
+
+> Activity启动模式指定为singleTask时，
+> 每次启动该Activity时，系统都会在返回栈中检查是否已经存在该Activity的实例，
+> 如果已经存在，会把这个Activity之上的所有其它Activity全部出栈，
+> 如果没有，就会创建一个新的Activity实例。
+
+![singleTask模式](./images/SingleTaskMode.png)
+
+#### 4. singleInstance
+
+> 如果Activity启动模式指定为singleInstance，
+> 系统会启用一个新的返回栈来管理这个Activity。
+
+![singleInstance模式](./images/SingleInstanceMode.png)
+
+### 杀掉当前进程
+> killProcess()方法用于杀掉一个进程，只能用于杀掉当前程序的进程。
+
+```java
+    android.os.Process.killProcess(android.os.Process.myPid());
+```
+
+## 2. 服务(Service)
 > 在后台默默地运行，即使退出了应用，服务仍然可以继续运行。
 
-#### 3. 广播接收器(Broadcast Reveiver)
+## 3. 广播接收器(Broadcast Reveiver)
 > 可以接收来自各处的广播消息，如电话，短信等。
 
-#### 4. 内容提供器(Content Provider)
+## 4. 内容提供器(Content Provider)
 > 为应用程序之间提供共享数据，比如想读取系统联系人，就要通过内容提供器。
 
