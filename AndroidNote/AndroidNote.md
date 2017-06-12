@@ -301,6 +301,95 @@
 ## 3. 广播接收器(Broadcast Reveiver)
 > 可以接收来自各处的广播消息，如电话，短信等。
 
+### 广播有两种类型
+> 标准广播和有序广播
+
+#### 标准广播
+> 是一种完全异步执行的广播
+
+#### 有序广播
+> 是一种同步执行的广播
+
+- 注册广播有两种方式，在代码中注册和在AndroidManifest.xml中注册，在代码中注册的称为动态注册，在AndroidManifest.xml中注册的称为静态注册。
+
+- 动态注册：
+``` java
+public class MainActivity extends AppCompatActivity {
+
+    private IntentFilter intentFilter;
+    private NetworkChangeReceiver networkChangeReceiver;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        intentFilter = new IntentFilter();
+        intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+        networkChangeReceiver = new NetworkChangeReceiver();
+        registerReceiver(networkChangeReceiver, intentFilter);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(networkChangeReceiver);
+    }
+
+    class NetworkChangeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // 处理接收广播
+        }
+    }
+}
+```
+
+- 静态注册：
+> 在AndroidManifest.xml中
+```xml
+    <receiver
+        android:name=".BootCompleteReveiver"
+        android:enabled="true"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        </intent-filter>
+    </receiver>
+```
+> 在代码中：
+``` java
+public class BootCompleteReveiver extends BroadcastReceiver {
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        // 处理接收到的广播
+    }
+}
+```
+
+- 发送广播:
+
+```java
+    Intent intent = new Intent("自定义的广播名称");
+    // 发送广播
+    sendBroadcast(intent);
+    // 发送有序广播
+    sendOrderedBroadcast(intent, null);
+```
+
+- 使用本地广播：
+
+``` java
+    LocalBroadcastManager localBroadcastManager;
+    localBroadcastManager = LocalBroadcastManager.getInstance(this);
+    Intent intent = new Intent("自定义的广播名称");
+    // 发送广播
+    localBroadcastManager.sendBroadcast(intent);
+    // 发送有序广播
+    localBroadcastManager.sendBroadcastSync(intent);
+```
+
 ## 4. 内容提供器(Content Provider)
 > 为应用程序之间提供共享数据，比如想读取系统联系人，就要通过内容提供器。
 
