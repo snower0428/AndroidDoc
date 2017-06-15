@@ -356,7 +356,7 @@
 
 ### 使用Service有两种主要方式：
 > 1. 通过调用Context的startService  
-> 2. 通过调用COntext的bindService
+> 2. 通过调用Context的bindService
 
 #### 1. startService方式
 > 通过startService方法启动的Service会一直无限期地运行下去，  
@@ -400,6 +400,90 @@ public class MyService extends Service {
 ##### 通过startService启动的Service的生命周期:
 
 ![Service生命周期](./images/StartServiceLifeCycle.png)
+
+#### 2. bindService方式
+
+##### 先创建Service，然后在Service内部创建Binder
+> 这个Binder就是用来实现Activity和Service之间通信的
+
+```java
+public class MyService extends Service {
+
+    public class MYBinder extends Binder {
+
+        public MyService getService() {
+            return MyService.this;
+        }
+    }
+
+    // 通过binder实现调用者client与service之间的通信
+    private MYBinder binder = new MYBinder();
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return binder;
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+    }
+}
+```
+
+##### 然后在Activity里创建ServiceConnect
+> 当执行onServiceConnected时，可以通IBinder得到servie实例，  
+> 这样就实现了Activity和Service的连接了。
+
+```java
+    private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            MyService.MYBinder myBinder = (MyService.MYBinder)binder;
+            service = myBinder.getService();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+        }
+    };
+```
+
+##### 通过bindService启动的Service的生命周期:
+
+![BindService生命周期](./images/BindServiceLifeCycle.png)
+
+### 使用IntentService
+
+> Android提供了一个IntentService类，专门用于自动开户线程，  
+> 服务运行完成，自动停止服务。
+
+```java
+public class MyIntentService extends IntentService {
+    
+    public MyIntentService() {
+        super("MyIntentService");
+    }
+
+    @Override
+    protected void onHandleIntent(Intent intent) {
+        // 在这里处理服务逻辑，处理完成会自动退出
+    }
+}
+    // 用法
+    Intent intentService = new Intent(this, MyIntentService.class);
+    startService(intentService);
+```
 
 ## 3. 广播接收器(Broadcast Reveiver)
 > 可以接收来自各处的广播消息，如电话，短信等。
@@ -708,12 +792,15 @@ public class MyProvider extends ContentProvider {
 
 ## 开源库：
 
-- LitePal
+- [LitePal](https://github.com/LitePalFramework/LitePal)
 > Android数据库框架
 
-- okhttp
+- [okhttp](https://github.com/square/okhttp)
 > 网络库
 
-- gson
+- [gson](https://github.com/google/gson)
 > json解析库
+
+- [glide](https://github.com/bumptech/glide)
+> 加载和展示图片库
 
