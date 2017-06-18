@@ -298,9 +298,509 @@
 ## 2. 服务(Service)
 > 在后台默默地运行，即使退出了应用，服务仍然可以继续运行。
 
+### 线程的基本用法
+
+```java
+    new Thread(new Runnable() {
+        @Override
+        public void run() {
+             // 处理具体逻辑
+        }
+    }).start();
+```
+
+### 使用AsyncTask进行异步处理
+
+#### 使用步骤：
+
+1. 创建一个子类继承自AsyncTask。
+2. 根据需求指定3个泛型参数类型。
+> 第一个参数：执行AsyncTask时需要传入的参数。  
+> 第二个参数：在后台执行任务时，如果需要显示进度，则做为进度单位。  
+> 第三个参数：任务执行完成后，如果需要返回结果，这里指定返回类型。
+3. 要启动任务，调用 new DownloadTask().execute();就可以了。
+
+```java
+    class DownloadTask extends AsyncTask<void, Integer, Boolean> {
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            // 后台任务开始之前调用
+        }
+
+        @Override
+        protected Boolean doInBackground(void... params) {
+            // 这个方法中的所有代码都会在子线程中运行
+            // 任务完成通过return返回
+            // 更新UI通过调用publishProgress(progress...)
+            return true;
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            super.onProgressUpdate(values);
+            // 如果在后台任务中调用了publishProgress(progress...)，
+            // 该方法很快就会被调用
+            // 在此方法中可以更新UI
+        }
+
+        @Override
+        protected void onPostExecute(Boolean aBoolean) {
+            super.onPostExecute(aBoolean);
+            // 如果后台任务通过return返回时，
+            // 该方法很快就会被调用
+            // 在此方法中可以更新UI
+        }
+    }
+```
+
+### 使用Service有两种主要方式：
+> 1. 通过调用Context的startService  
+> 2. 通过调用Context的bindService
+
+#### 1. startService方式
+> 通过startService方法启动的Service会一直无限期地运行下去，  
+> 只有在外部调用Context的stopService或Service内部调用Service的stopSelf方法，  
+> 该Service才会停止运行并销毁。
+
+##### 要使用Service，要继承自Service然后重写下面的方法：
+```java
+public class MyService extends Service {
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // 执行startService时，
+        // 1.如果Service没有运行，则会创建Service并且执行Service的onCreate
+        // 2.如果Service已经处于运行中，，则不会执行onCreate
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return super.onStartCommand(intent, flags, startId);
+        // 每次执行startService，都会执行onStartCommand方法。
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        // TODO: Return the communication channel to the service.
+        // 该方法是Service的抽象方法，必须重写
+        // 没用用到返回null就行，比如通过startService启动时。
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // 当调用Context的stopService或Service的stopSelf时,
+        // Service才会停止运行并销毁。
+    }
+}
+```
+
+##### 通过startService启动的Service的生命周期:
+
+![Service生命周期](./images/StartServiceLifeCycle.png)
+
+#### 2. bindService方式
+
+##### 先创建Service，然后在Service内部创建Binder
+> 这个Binder就是用来实现Activity和Service之间通信的
+
+```java
+public class MyService extends Service {
+
+    public class MYBinder extends Binder {
+
+        public MyService getService() {
+            return MyService.this;
+        }
+    }
+
+    // 通过binder实现调用者client与service之间的通信
+    private MYBinder binder = new MYBinder();
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return binder;
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+    }
+}
+```
+
+##### 然后在Activity里创建ServiceConnect
+> 当执行onServiceConnected时，可以通IBinder得到servie实例，  
+> 这样就实现了Activity和Service的连接了。
+
+```java
+    private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            MyService.MYBinder myBinder = (MyService.MYBinder)binder;
+            service = myBinder.getService();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+        }
+    };
+```
+
+##### 通过bindService启动的Service的生命周期:
+
+![BindService生命周期](./images/BindServiceLifeCycle.png)
+
+### 使用IntentService
+
+> Android提供了一个IntentService类，专门用于自动开户线程，  
+> 服务运行完成，自动停止服务。
+
+```java
+public class MyIntentService extends IntentService {
+    
+    public MyIntentService() {
+        super("MyIntentService");
+    }
+
+    @Override
+    protected void onHandleIntent(Intent intent) {
+        // 在这里处理服务逻辑，处理完成会自动退出
+    }
+}
+    // 用法
+    Intent intentService = new Intent(this, MyIntentService.class);
+    startService(intentService);
+```
+
 ## 3. 广播接收器(Broadcast Reveiver)
 > 可以接收来自各处的广播消息，如电话，短信等。
 
+### 广播有两种类型
+> 标准广播和有序广播
+
+#### 标准广播
+> 是一种完全异步执行的广播
+
+#### 有序广播
+> 是一种同步执行的广播
+
+- 注册广播有两种方式，在代码中注册和在AndroidManifest.xml中注册，在代码中注册的称为动态注册，在AndroidManifest.xml中注册的称为静态注册。
+
+- 动态注册：
+``` java
+public class MainActivity extends AppCompatActivity {
+
+    private IntentFilter intentFilter;
+    private NetworkChangeReceiver networkChangeReceiver;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        intentFilter = new IntentFilter();
+        intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+        networkChangeReceiver = new NetworkChangeReceiver();
+        registerReceiver(networkChangeReceiver, intentFilter);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(networkChangeReceiver);
+    }
+
+    class NetworkChangeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // 处理接收广播
+        }
+    }
+}
+```
+
+- 静态注册：
+> 在AndroidManifest.xml中
+```xml
+    <receiver
+        android:name=".BootCompleteReveiver"
+        android:enabled="true"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        </intent-filter>
+    </receiver>
+```
+> 在代码中：
+``` java
+public class BootCompleteReveiver extends BroadcastReceiver {
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        // 处理接收到的广播
+    }
+}
+```
+
+- 发送广播:
+
+```java
+    Intent intent = new Intent("自定义的广播名称");
+    // 发送广播
+    sendBroadcast(intent);
+    // 发送有序广播
+    sendOrderedBroadcast(intent, null);
+```
+
+- 使用本地广播：
+
+``` java
+    LocalBroadcastManager localBroadcastManager;
+    localBroadcastManager = LocalBroadcastManager.getInstance(this);
+    Intent intent = new Intent("自定义的广播名称");
+    // 发送广播
+    localBroadcastManager.sendBroadcast(intent);
+    // 发送有序广播
+    localBroadcastManager.sendBroadcastSync(intent);
+```
+
 ## 4. 内容提供器(Content Provider)
-> 为应用程序之间提供共享数据，比如想读取系统联系人，就要通过内容提供器。
+> 主要用于在不同的应用程序之间实现数据共享的功能，它提供了一套完整的机制，
+> 允许一个程序访问另一个程序中的数据，同时还能保证被访数据的安全性。
+
+### 运行时权限申请：
+```java
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this, new String[]{ Manifest.permission.CALL_PHONE }, 1);
+        }
+        else {
+            call();
+        }
+    }
+
+    private void call() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_CALL);
+            intent.setData(Uri.parse("tel:10086"));
+            startActivity(intent);
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode) {
+            case 1:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    call();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+```
+
+### 一般有两种用法
+
+- 使用现有的内容提供器来读取和操作相应程序中的数据。
+- 创建自己的内容提供器给我们程序的数据提供外部访问接口。
+
+#### 内容URI
+
+>  内容URI给内容提供器中的数据建立唯一标识符。
+
+- 标准写法：content://com.example.app.provider/table1
+> 还可以在后面加一个id:content://com.example.app.provider/table1/id，  
+> 表示期望访问talbe1表中id为xx的数据。  
+> 支持用通配符来指定talbe和id，  
+> \*：表示匹配任意长度的任意字符。  
+> \#：表示匹配任意长度的数字。  
+> content://com.example.app.provider/\* 表示匹配任意表的内容。  
+> content://com.example.app.provider/table1/\# 表示匹配table1中任意一行的内容。
+
+- 由两部分组成：authority和path
+> authority用于对不同的应用程序做区分的，一般用包名命名。
+> 如com.example.app.provider，
+> path是用于对同一个程序中不同的表做区分的，添加到authority后面。
+> 如/table1，
+> content://为头部协议
+
+- 读取系统联系人例子：
+```java
+    ArrayAdapter<String> adapter;
+    List<String> contactsList = new ArrayList<>();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        ListView contactsView = (ListView) findViewById(R.id.contacts_view);
+        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, contactsList);
+        contactsView.setAdapter(adapter);
+
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this, new String[]{ Manifest.permission.READ_CONTACTS }, 1);
+        } else {
+            readContacts();
+        }
+    }
+
+    private void readContacts() {
+        Cursor cursor = null;
+        try {
+            cursor = getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, null, null, null);
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    String displayName = cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
+                    String number = cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                    contactsList.add(displayName + "\n" + number);
+                }
+                adapter.notifyDataSetChanged();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        switch (requestCode) {
+            case 1:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    readContacts();
+                } else {
+                    Toast.makeText(this, "You denied the permission", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+```
+
+#### 创建内容提供器
+
+##### 新建一个类继承自ContentProvider
+> 必须重写父类的6个抽象方法
+
+```java
+public class MyProvider extends ContentProvider {
+
+    @Override
+    public boolean onCreate() {
+        // TODO: Implement this to initialize your content provider on startup.
+        // 返回true表示初始化成功，返回false表示失败
+        return false;
+    }
+
+    @Override
+    public Cursor query(Uri uri, String[] projection, String selection,
+                        String[] selectionArgs, String sortOrder) {
+        // TODO: Implement this to handle query requests from clients.
+        // 查询数据
+    }
+
+    @Override
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
+        // Implement this to handle requests to delete one or more rows.
+        // 删除数据
+    }
+
+    @Override
+    public Uri insert(Uri uri, ContentValues values) {
+        // TODO: Implement this to handle requests to insert a new row.
+        // 添加数据
+    }
+
+    @Override
+    public int update(Uri uri, ContentValues values, String selection,
+                      String[] selectionArgs) {
+        // TODO: Implement this to handle requests to update one or more rows.
+        // 更新数据
+    }
+
+    @Override
+    public String getType(Uri uri) {
+        // TODO: Implement this to handle requests for the MIME type of the data
+        // at the given URI.
+        // 返回相应的MIME类型
+        // 一个URI对应的MIME字符串主要由3部分组成：
+        // 1.必须以vnd开头
+        // 2.如果URI以路径结尾，后接android.cursor.dir/
+        //   如果RUI以id结尾, 后接android.cursor.item/
+        // 3.最后接上and.<authority>.<path>
+    }
+}
+```
+
+## 使用通知
+
+### 创建通知的步骤
+
+1. 使用NotificationManager来管理通知。
+2. 使用Builder构造器来创建Notification对象。
+3. 调用NotificationManager的notify()方法显示通知。
+
+```java
+    // 1.
+    NotificationManager manager = getSystemService(Context.NOTIFICATION_SERVICE);
+    // 2.
+    Intent intent = new Intent(this, NotificationActivity.class);
+    PendingIntent pi = PendingIntent.getActivity(this, 0, intent, 0);
+    Notification notification = new NotificationCompat.Builder(context)
+            .setContentTitle("This is title")
+            .setContentText("This is content text")
+            .setWhen(System.currentTimeMillis())
+            .setSmallIcon(R.drawable.small_icon)
+            .setLargeIcon(BitmapFactory.decodeResource(getResources(), R.drawable.large_icon))
+            .setContentIntent(pi)   // 点击通知跳转页面
+            .setAutoCancel(true)    // 点击通知自动消失
+            .build();
+    // 3.
+    manager.notify(1, notification);
+```
+
+
+
+## 开源库：
+
+- [LitePal](https://github.com/LitePalFramework/LitePal)
+> Android数据库框架
+
+- [okhttp](https://github.com/square/okhttp)
+> 网络库
+
+- [gson](https://github.com/google/gson)
+> json解析库
+
+- [glide](https://github.com/bumptech/glide)
+> 加载和展示图片库
 
