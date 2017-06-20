@@ -756,7 +756,7 @@ public class MyProvider extends ContentProvider {
         // 1.必须以vnd开头
         // 2.如果URI以路径结尾，后接android.cursor.dir/
         //   如果RUI以id结尾, 后接android.cursor.item/
-        // 3.最后接上and.<authority>.<path>
+        // 3.最后接上vnd.<authority>.<path>
     }
 }
 ```
